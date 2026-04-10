@@ -9,9 +9,9 @@ const DEFAULT_EVENT = {
   description: "Join us live on X Spaces for the latest in blockchain, crypto & AI.",
   spaceUrl: "https://twitter.com/i/spaces/placeholder",
   date: "",
-  time: "12:00",
-  timezone: "America/New_York",
-  duration: 60,
+  time: "04:00",
+  timezone: "Asia/Singapore",
+  duration: 90,
 };
 
 function googleCalLink(event) {
@@ -191,7 +191,7 @@ export default function App() {
                 {formatDisplayDate(event.date, event.time)}
               </div>
               <div style={{ fontSize: "13px", color: "#FF6B35", fontFamily: "'Space Mono', monospace", marginTop: "2px" }}>
-                {event.date ? `${formatDisplayTime(event.time)} ET · ${event.duration} min` : "Date & time TBA"}
+                {event.date ? `${formatDisplayTime(event.time)} GMT+8 · ${event.duration} min` : "Date & time TBA"}
               </div>
             </div>
           </div>
@@ -321,7 +321,7 @@ export default function App() {
               { label: "Description", key: "description", type: "text" },
               { label: "X Space Link", key: "spaceUrl", type: "url" },
               { label: "Date", key: "date", type: "date" },
-              { label: "Time (ET)", key: "time", type: "time" },
+              { label: "Time (GMT+8)", key: "time", type: "time" },
               { label: "Duration (min)", key: "duration", type: "number" },
             ].map(({ label, key, type }) => (
               <div key={key} style={{ marginBottom: "12px" }}>
