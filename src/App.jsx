@@ -94,9 +94,8 @@ export default function App() {
   const feedUrlHttps = API_BASE + "/calendar.ics";
   const feedUrl = feedUrlHttps.replace(/^https?:/, "webcal:");
 
-  // Google Calendar: cid expects URL-safe base64 of the https URL
-  const googleCid = btoa(feedUrlHttps).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const googleSubscribeUrl = `https://calendar.google.com/calendar/r?cid=${googleCid}`;
+  // Google Calendar: cid with webcal:// protocol (no encoding)
+  const googleSubscribeUrl = `https://calendar.google.com/calendar/r?cid=${feedUrl}`;
 
   useEffect(() => {
     (async () => {
