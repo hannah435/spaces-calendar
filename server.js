@@ -139,7 +139,7 @@ app.get("/calendar.ics", (req, res) => {
 // --- Serve built frontend in production ---
 if (existsSync(join(__dirname, "dist"))) {
   app.use(express.static(join(__dirname, "dist")));
-  app.get("*", (req, res) => {
+  app.get("*path", (req, res) => {
     res.sendFile(join(__dirname, "dist", "index.html"));
   });
 }
