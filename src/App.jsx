@@ -94,9 +94,8 @@ export default function App() {
   const feedUrlHttps = API_BASE + "/calendar.ics";
   const feedUrl = feedUrlHttps.replace(/^https?:/, "webcal:");
 
-  // Google Calendar subscribe: uses their "add by URL" endpoint
-  // Google requires a publicly accessible https URL
-  const googleSubscribeUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrlHttps)}`;
+  // Google Calendar subscribe: uses webcal:// protocol in the cid parameter
+  const googleSubscribeUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`;
 
   useEffect(() => {
     (async () => {
