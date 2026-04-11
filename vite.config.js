@@ -8,6 +8,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3001',
       '/calendar.ics': 'http://localhost:3001',
+      '/feed.ics': 'http://localhost:3001',
     },
   },
 })

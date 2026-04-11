@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 const DEFAULT_EVENT = {
-  title: "Tokenize Weekly X Spaces",
+  title: "BitAngels Weekly X Spaces (US Edition)",
   description: "Join us live on X Spaces for the latest in blockchain, crypto & AI.",
   spaceUrl: "https://twitter.com/i/spaces/placeholder",
   date: "",
@@ -77,7 +77,7 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const feedUrlHttps = API_BASE + "/calendar.ics";
+  const feedUrlHttps = API_BASE + "/feed.ics";
   const feedUrl = feedUrlHttps.replace(/^https?:/, "webcal:");
 
   // Google Calendar: cid with webcal:// protocol (no encoding)

@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 const DEFAULT_EVENT = {
-  title: "Tokenize Weekly X Spaces",
+  title: "BitAngels Weekly X Spaces (US Edition)",
   description: "Join us live on X Spaces for the latest in blockchain, crypto & AI.",
   spaceUrl: "https://twitter.com/i/spaces/placeholder",
   date: "",
@@ -49,7 +49,7 @@ app.post("/api/event", (req, res) => {
 });
 
 // --- Dynamic ICS feed (this is the magic URL users subscribe to) ---
-app.get("/calendar.ics", (req, res) => {
+app.get(["/feed.ics", "/calendar.ics"], (req, res) => {
   const event = loadEvent();
 
   if (!event.date) {
@@ -61,7 +61,7 @@ app.get("/calendar.ics", (req, res) => {
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//TokenizeCon//SpacesInvite//EN",
-        "X-WR-CALNAME:Tokenize X Spaces",
+        "X-WR-CALNAME:BitAngels Weekly Spaces (US)",
         "METHOD:PUBLISH",
         "END:VCALENDAR",
       ].join("\r\n")
@@ -95,7 +95,7 @@ app.get("/calendar.ics", (req, res) => {
     now.getUTCDate()
   )}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
 
-  const uid = "tokenize-weekly-spaces@tokenizecon.com";
+  const uid = "bitangels-weekly-us@spaces-calendar.onrender.com";
 
   const ics = [
     "BEGIN:VCALENDAR",
