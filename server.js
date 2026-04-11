@@ -72,14 +72,28 @@ app.get("/calendar.ics", (req, res) => {
   const [year, month, day] = event.date.split("-").map(Number);
   const [hour, minute] = event.time.split(":").map(Number);
 
-  const dtStart = `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`;
-  const endDate = new Date(year, month - 1, day, hour, minute + event.duration);
-  const dtEnd = `${endDate.getFullYear()}${pad(endDate.getMonth() + 1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`;
+  // Convert local time to UTC for universal timezone support
+  // Build a date string with the timezone, then convert to UTC
+  const tzOffsets = {
+    "America/Los_Angeles": { std: -8, dst: -7 },
+    "America/New_York": { std: -5, dst: -4 },
+    "Asia/Singapore": { std: 8, dst: 8 },
+  };
+  const tz = tzOffsets[event.timezone] || { std: 0, dst: 0 };
+  // Simple DST check for US timezones (March-November)
+  const isDST = month >= 3 && month <= 10;
+  const offset = tz.std === tz.dst ? tz.std : (isDST ? tz.dst : tz.std);
+
+  const utcStart = new Date(Date.UTC(year, month - 1, day, hour - offset, minute));
+  const utcEnd = new Date(Date.UTC(year, month - 1, day, hour - offset, minute + event.duration));
+
+  const dtStartUTC = `${utcStart.getUTCFullYear()}${pad(utcStart.getUTCMonth() + 1)}${pad(utcStart.getUTCDate())}T${pad(utcStart.getUTCHours())}${pad(utcStart.getUTCMinutes())}00Z`;
+  const dtEndUTC = `${utcEnd.getUTCFullYear()}${pad(utcEnd.getUTCMonth() + 1)}${pad(utcEnd.getUTCDate())}T${pad(utcEnd.getUTCHours())}${pad(utcEnd.getUTCMinutes())}00Z`;
 
   const now = new Date();
-  const dtstamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
-    now.getDate()
-  )}T${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}Z`;
+  const dtstamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(
+    now.getUTCDate()
+  )}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
 
   const uid = "tokenize-weekly-spaces@tokenizecon.com";
 
@@ -89,33 +103,15 @@ app.get("/calendar.ics", (req, res) => {
     "PRODID:-//TokenizeCon//SpacesInvite//EN",
     "CALSCALE:GREGORIAN",
     "X-WR-CALNAME:Tokenize X Spaces",
-    "X-WR-TIMEZONE:America/Los_Angeles",
     "METHOD:PUBLISH",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",
-    "BEGIN:VTIMEZONE",
-    "TZID:America/Los_Angeles",
-    "BEGIN:STANDARD",
-    "DTSTART:19701101T020000",
-    "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
-    "TZOFFSETFROM:-0700",
-    "TZOFFSETTO:-0800",
-    "TZNAME:PST",
-    "END:STANDARD",
-    "BEGIN:DAYLIGHT",
-    "DTSTART:19700308T020000",
-    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
-    "TZOFFSETFROM:-0800",
-    "TZOFFSETTO:-0700",
-    "TZNAME:PDT",
-    "END:DAYLIGHT",
-    "END:VTIMEZONE",
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTAMP:${dtstamp}`,
     `SEQUENCE:${Math.floor(now.getTime() / 60000)}`,
-    `DTSTART;TZID=${event.timezone}:${dtStart}`,
-    `DTEND;TZID=${event.timezone}:${dtEnd}`,
+    `DTSTART:${dtStartUTC}`,
+    `DTEND:${dtEndUTC}`,
     `RRULE:FREQ=WEEKLY;COUNT=52`,
     `SUMMARY:${event.title}`,
     `DESCRIPTION:${event.description}\\n\\nJoin here: ${event.spaceUrl}`,
