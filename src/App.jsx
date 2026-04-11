@@ -9,8 +9,8 @@ const DEFAULT_EVENT = {
   description: "Join us live on X Spaces for the latest in blockchain, crypto & AI.",
   spaceUrl: "https://twitter.com/i/spaces/placeholder",
   date: "",
-  time: "04:00",
-  timezone: "Asia/Singapore",
+  time: "13:00",
+  timezone: "America/Los_Angeles",
   duration: 90,
 };
 
@@ -50,20 +50,6 @@ function outlookLink(event) {
   return `https://outlook.live.com/calendar/0/deeplink/compose?${params}`;
 }
 
-function formatDisplayDate(dateStr, timeStr) {
-  if (!dateStr) return "Date TBA";
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const [hour, minute] = timeStr.split(":").map(Number);
-  const d = new Date(year, month - 1, day, hour, minute);
-  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-}
-
-function formatDisplayTime(timeStr) {
-  if (!timeStr) return "";
-  const [hour, minute] = timeStr.split(":").map(Number);
-  const d = new Date(2000, 0, 1, hour, minute);
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
 
 const btnBase = {
   border: "none",
@@ -188,10 +174,10 @@ export default function App() {
             }}>📅</div>
             <div>
               <div style={{ fontSize: "15px", fontWeight: "600", color: "#eee" }}>
-                {formatDisplayDate(event.date, event.time)}
+                Every Thursday
               </div>
               <div style={{ fontSize: "13px", color: "#FF6B35", fontFamily: "'Space Mono', monospace", marginTop: "2px" }}>
-                {event.date ? `${formatDisplayTime(event.time)} GMT+8 · ${event.duration} min` : "Date & time TBA"}
+                1:00 PM PT · {event.duration} min
               </div>
             </div>
           </div>
@@ -321,7 +307,7 @@ export default function App() {
               { label: "Description", key: "description", type: "text" },
               { label: "X Space Link", key: "spaceUrl", type: "url" },
               { label: "Date", key: "date", type: "date" },
-              { label: "Time (GMT+8)", key: "time", type: "time" },
+              { label: "Time (PT)", key: "time", type: "time" },
               { label: "Duration (min)", key: "duration", type: "number" },
             ].map(({ label, key, type }) => (
               <div key={key} style={{ marginBottom: "12px" }}>
