@@ -72,38 +72,16 @@ app.get("/calendar.ics", (req, res) => {
   const [year, month, day] = event.date.split("-").map(Number);
   const [hour, minute] = event.time.split(":").map(Number);
 
+  const dtStart = `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`;
+  const endDate = new Date(year, month - 1, day, hour, minute + event.duration);
+  const dtEnd = `${endDate.getFullYear()}${pad(endDate.getMonth() + 1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`;
+
   const now = new Date();
   const dtstamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
     now.getDate()
   )}T${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}Z`;
 
-  // Generate next 12 weeks of events so it shows as recurring
-  const weeks = 12;
-  const eventLines = [];
-  for (let i = 0; i < weeks; i++) {
-    const startDate = new Date(year, month - 1, day + i * 7, hour, minute);
-    const endDateObj = new Date(year, month - 1, day + i * 7, hour, minute + event.duration);
-
-    const dtStart = `${startDate.getFullYear()}${pad(startDate.getMonth() + 1)}${pad(startDate.getDate())}T${pad(startDate.getHours())}${pad(startDate.getMinutes())}00`;
-    const dtEnd = `${endDateObj.getFullYear()}${pad(endDateObj.getMonth() + 1)}${pad(endDateObj.getDate())}T${pad(endDateObj.getHours())}${pad(endDateObj.getMinutes())}00`;
-
-    // Stable UID per week so updates replace rather than duplicate
-    const uid = `tokenize-weekly-spaces-week${i}@tokenizecon.com`;
-
-    eventLines.push(
-      "BEGIN:VEVENT",
-      `UID:${uid}`,
-      `DTSTAMP:${dtstamp}`,
-      `SEQUENCE:${Math.floor(now.getTime() / 60000)}`,
-      `DTSTART;TZID=${event.timezone}:${dtStart}`,
-      `DTEND;TZID=${event.timezone}:${dtEnd}`,
-      `SUMMARY:${event.title}`,
-      `DESCRIPTION:${event.description}\\n\\nJoin here: ${event.spaceUrl}`,
-      `URL:${event.spaceUrl}`,
-      `LOCATION:${event.spaceUrl}`,
-      "END:VEVENT"
-    );
-  }
+  const uid = "tokenize-weekly-spaces@tokenizecon.com";
 
   const ics = [
     "BEGIN:VCALENDAR",
@@ -115,7 +93,6 @@ app.get("/calendar.ics", (req, res) => {
     "METHOD:PUBLISH",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",
-    // VTIMEZONE required by Apple Calendar
     "BEGIN:VTIMEZONE",
     "TZID:Asia/Singapore",
     "BEGIN:STANDARD",
@@ -125,7 +102,18 @@ app.get("/calendar.ics", (req, res) => {
     "TZNAME:SGT",
     "END:STANDARD",
     "END:VTIMEZONE",
-    ...eventLines,
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `SEQUENCE:${Math.floor(now.getTime() / 60000)}`,
+    `DTSTART;TZID=${event.timezone}:${dtStart}`,
+    `DTEND;TZID=${event.timezone}:${dtEnd}`,
+    `RRULE:FREQ=WEEKLY;COUNT=52`,
+    `SUMMARY:${event.title}`,
+    `DESCRIPTION:${event.description}\\n\\nJoin here: ${event.spaceUrl}`,
+    `URL:${event.spaceUrl}`,
+    `LOCATION:${event.spaceUrl}`,
+    "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
 
