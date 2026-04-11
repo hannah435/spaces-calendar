@@ -9,8 +9,47 @@ const DATA_FILE = join(__dirname, "event-data.json");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+// --- Security: PIN from environment variable (never hardcoded) ---
+const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
+
+// --- Security: Restrict CORS to your own domain ---
+const ALLOWED_ORIGINS = [
+  "https://spaces-calendar.onrender.com",
+  "http://localhost:5173",
+  "http://localhost:3001",
+];
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(null, false);
+  },
+}));
+
+app.use(express.json({ limit: "10kb" }));
+
+// --- Security: Rate limiting for admin endpoint ---
+const loginAttempts = new Map();
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip) {
+  const record = loginAttempts.get(ip);
+  if (!record) return false;
+  if (Date.now() - record.firstAttempt > LOCKOUT_MS) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+  return record.count >= MAX_ATTEMPTS;
+}
+
+function recordAttempt(ip) {
+  const record = loginAttempts.get(ip);
+  if (!record || Date.now() - record.firstAttempt > LOCKOUT_MS) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: Date.now() });
+  } else {
+    record.count++;
+  }
+}
 
 const DEFAULT_EVENT = {
   title: "BitAngels Weekly X Spaces (US Edition)",
@@ -33,6 +72,42 @@ function saveEvent(event) {
   writeFileSync(DATA_FILE, JSON.stringify(event, null, 2));
 }
 
+// --- Security: Sanitize text for ICS (prevent ICS injection) ---
+function sanitizeICS(str) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/\r\n/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\r/g, " ")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .slice(0, 500);
+}
+
+// --- Security: Validate URL format ---
+function isValidUrl(str) {
+  try {
+    const url = new URL(str);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+// --- Security: Validate event data ---
+function validateEvent(event) {
+  if (!event || typeof event !== "object") return "Invalid event data";
+  if (typeof event.title !== "string" || event.title.length > 200) return "Invalid title";
+  if (typeof event.description !== "string" || event.description.length > 500) return "Invalid description";
+  if (typeof event.spaceUrl !== "string" || !isValidUrl(event.spaceUrl)) return "Invalid Space URL";
+  if (event.date && !/^\d{4}-\d{2}-\d{2}$/.test(event.date)) return "Invalid date format";
+  if (!/^\d{2}:\d{2}$/.test(event.time)) return "Invalid time format";
+  if (typeof event.duration !== "number" || event.duration < 1 || event.duration > 480) return "Invalid duration";
+  const validTimezones = ["America/Los_Angeles", "America/New_York", "Asia/Singapore"];
+  if (!validTimezones.includes(event.timezone)) return "Invalid timezone";
+  return null;
+}
+
 // --- API: Get current event ---
 app.get("/api/event", (req, res) => {
   res.json(loadEvent());
@@ -40,27 +115,51 @@ app.get("/api/event", (req, res) => {
 
 // --- API: Update event (admin) ---
 app.post("/api/event", (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress;
+
+  if (isRateLimited(ip)) {
+    return res.status(429).json({ error: "Too many attempts. Try again in 15 minutes." });
+  }
+
   const { pin, event } = req.body;
-  if (pin !== "1234") {
+
+  if (!pin || typeof pin !== "string" || pin !== ADMIN_PIN) {
+    recordAttempt(ip);
     return res.status(401).json({ error: "Invalid PIN" });
   }
-  saveEvent(event);
+
+  const validationError = validateEvent(event);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
+  // Only save allowed fields
+  const sanitizedEvent = {
+    title: event.title.trim(),
+    description: event.description.trim(),
+    spaceUrl: event.spaceUrl.trim(),
+    date: event.date,
+    time: event.time,
+    timezone: event.timezone,
+    duration: event.duration,
+  };
+
+  saveEvent(sanitizedEvent);
   res.json({ ok: true });
 });
 
-// --- Dynamic ICS feed (this is the magic URL users subscribe to) ---
+// --- Dynamic ICS feed ---
 app.get(["/feed.ics", "/calendar.ics"], (req, res) => {
   const event = loadEvent();
 
   if (!event.date) {
-    // If no date set yet, return a placeholder event
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.send(
       [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//TokenizeCon//SpacesInvite//EN",
+        "PRODID:-//BitAngels//SpacesInvite//EN",
         "X-WR-CALNAME:BitAngels Weekly Spaces (US)",
         "METHOD:PUBLISH",
         "END:VCALENDAR",
@@ -72,15 +171,12 @@ app.get(["/feed.ics", "/calendar.ics"], (req, res) => {
   const [year, month, day] = event.date.split("-").map(Number);
   const [hour, minute] = event.time.split(":").map(Number);
 
-  // Convert local time to UTC for universal timezone support
-  // Build a date string with the timezone, then convert to UTC
   const tzOffsets = {
     "America/Los_Angeles": { std: -8, dst: -7 },
     "America/New_York": { std: -5, dst: -4 },
     "Asia/Singapore": { std: 8, dst: 8 },
   };
   const tz = tzOffsets[event.timezone] || { std: 0, dst: 0 };
-  // Simple DST check for US timezones (March-November)
   const isDST = month >= 3 && month <= 10;
   const offset = tz.std === tz.dst ? tz.std : (isDST ? tz.dst : tz.std);
 
@@ -100,9 +196,9 @@ app.get(["/feed.ics", "/calendar.ics"], (req, res) => {
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//TokenizeCon//SpacesInvite//EN",
+    "PRODID:-//BitAngels//SpacesInvite//EN",
     "CALSCALE:GREGORIAN",
-    "X-WR-CALNAME:Tokenize X Spaces",
+    "X-WR-CALNAME:BitAngels Weekly Spaces (US)",
     "METHOD:PUBLISH",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",
@@ -113,16 +209,15 @@ app.get(["/feed.ics", "/calendar.ics"], (req, res) => {
     `DTSTART:${dtStartUTC}`,
     `DTEND:${dtEndUTC}`,
     `RRULE:FREQ=WEEKLY;COUNT=52`,
-    `SUMMARY:${event.title}`,
-    `DESCRIPTION:${event.description}\\n\\nJoin here: ${event.spaceUrl}`,
-    `URL:${event.spaceUrl}`,
-    `LOCATION:${event.spaceUrl}`,
+    `SUMMARY:${sanitizeICS(event.title)}`,
+    `DESCRIPTION:${sanitizeICS(event.description)}\\n\\nJoin here: ${sanitizeICS(event.spaceUrl)}`,
+    `URL:${sanitizeICS(event.spaceUrl)}`,
+    `LOCATION:${sanitizeICS(event.spaceUrl)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
 
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-  // Short cache so calendars pick up changes quickly
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   res.send(ics);
 });
@@ -137,5 +232,4 @@ if (existsSync(join(__dirname, "dist"))) {
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Calendar feed: http://localhost:${PORT}/calendar.ics`);
 });
